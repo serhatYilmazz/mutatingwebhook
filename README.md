@@ -135,3 +135,15 @@ go build -o webhook && \
 export USE_KUBECONFIG=true && \
 ./webhook 
 ````
+- To test functionality of connection and fetching resources from k8s cluster
+    - Don't forget to set USE_KUBECONFIG property to true
+````
+func test() {
+	pods, err := clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("Number of pods %d\n", len(pods.Items))
+}
+````
