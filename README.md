@@ -113,3 +113,15 @@ apk add --no-cache curl && \
 chmod +x kubectl && \
 mv ./kubectl /usr/local/bin/kubectl
 ```
+- We need global se/deserializer for k8s objects. Therefore, we import: 
+```
+"k8s.io/apimachinery/pkg/runtime"
+"k8s.io/apimachinery/pkg/runtime/serializer"
+```
+
+and as global variable:
+```
+var (
+	globalDeserializer = serializer.NewCodecFactory(runtime.NewScheme())
+)
+```
