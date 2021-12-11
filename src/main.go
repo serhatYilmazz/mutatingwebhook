@@ -3,6 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+)
+
+var (
+	globalDeserializer = serializer.NewCodecFactory(runtime.NewScheme())
 )
 
 func main() {
