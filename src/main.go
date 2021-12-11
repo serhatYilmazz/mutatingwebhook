@@ -52,12 +52,12 @@ func main() {
 		config = flags
 	}
 
-	// clientSet is to talk to K8s API
-	//forConfig, err := kubernetes.NewForConfig(config)
-	//if err != nil {
-	//	panic(err.Error())
-	//}
-	//clientSet = forConfig
+	//clientSet is to talk to K8s API
+	forConfig, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+	clientSet = forConfig
 
 	test()
 	http.HandleFunc("/", HandleRoot)
