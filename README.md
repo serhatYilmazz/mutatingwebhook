@@ -158,3 +158,17 @@ flag.Parse()
 ...
 log.Fatal(http.ListenAndServeTLS(":" + strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
 ```
+
+- Write the incoming api request and write them into a file 
+```
+func HandleMutate(writer http.ResponseWriter, request *http.Request) {
+	body, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = ioutil.WriteFile("/tmp/request", body, 0644)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+```

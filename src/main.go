@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -81,7 +82,14 @@ func main() {
 }
 
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
-	writer.Write([]byte("Mutate"))
+	body, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = ioutil.WriteFile("/tmp/request", body, 0644)
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
 func HandleRoot(writer http.ResponseWriter, request *http.Request) {
