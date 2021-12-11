@@ -125,3 +125,13 @@ var (
 	globalDeserializer = serializer.NewCodecFactory(runtime.NewScheme())
 )
 ```
+
+### Authentication
+- In production environment we can use K8s ServiceAccount token to authenticate with the API server.
+- When we are in development, we can use ~/.kube/config
+
+````shell
+go build -o webhook && \
+export USE_KUBECONFIG=true && \
+./webhook 
+````
