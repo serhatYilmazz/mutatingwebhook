@@ -53,12 +53,13 @@ func main() {
 	}
 
 	// clientSet is to talk to K8s API
-	forConfig, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-	clientSet = forConfig
+	//forConfig, err := kubernetes.NewForConfig(config)
+	//if err != nil {
+	//	panic(err.Error())
+	//}
+	//clientSet = forConfig
 
+	test()
 	http.HandleFunc("/", HandleRoot)
 	http.HandleFunc("/mutate", HandleMutate)
 	log.Fatal(http.ListenAndServe(":80", nil))
