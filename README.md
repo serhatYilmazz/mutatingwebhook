@@ -147,3 +147,14 @@ func test() {
 	fmt.Printf("Number of pods %d\n", len(pods.Items))
 }
 ````
+
+### Expose an Endpoint to enable TLS
+- Changing these parameters by users from the Command line.
+```
+flag.IntVar(&serverParameters.port, "port", 8443, "webhook server port")
+flag.StringVar(&serverParameters.certFile, "tlsCertFile", "/etc/webhook/certs/tls.crt", "File containing the x509 certificate")
+flag.StringVar(&serverParameters.keyFile, "tlsKeyFile", "/etc/webhook/certs/tls.key", "File containing the x509 private key")
+flag.Parse()
+...
+log.Fatal(http.ListenAndServeTLS(":" + strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
+```

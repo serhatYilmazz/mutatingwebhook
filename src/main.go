@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -12,18 +13,32 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
+
+type ServerParameters struct {
+	port     int    // webhook server port
+	certFile string // path to the x509 certificate for https
+	keyFile  string // path to the x509 private key matching Certfile
+}
 
 var (
 	globalDeserializer = serializer.NewCodecFactory(runtime.NewScheme())
 	config             *rest.Config
 	clientSet          *kubernetes.Clientset
 	kubeConfig         string
+	serverParameters   ServerParameters
 )
 
 func main() {
 	useKubeConfig := os.Getenv("USE_KUBECONFIG") // In production, it does not exist. It will be ServiceAccount token in production
 	kubeConfigFilePath := os.Getenv("KUBECONFIG")
+
+	// Changing these parameters by users from Command line.
+	flag.IntVar(&serverParameters.port, "port", 8443, "webhook server port")
+	flag.StringVar(&serverParameters.certFile, "tlsCertFile", "/etc/webhook/certs/tls.crt", "File containing the x509 certificate")
+	flag.StringVar(&serverParameters.keyFile, "tlsKeyFile", "/etc/webhook/certs/tls.key", "File containing the x509 private key")
+	flag.Parse()
 
 	// When talking to k8s, One way is the use ServiceAccount token
 	// The other way is local ~/.kube/config file.
@@ -62,7 +77,7 @@ func main() {
 	test()
 	http.HandleFunc("/", HandleRoot)
 	http.HandleFunc("/mutate", HandleMutate)
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(http.ListenAndServeTLS(":" + strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
 }
 
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
