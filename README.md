@@ -8,7 +8,15 @@ kind create cluster --name webhook --image kindest/node:v1.23.0
 docker run -it --rm -v ${PWD}:/work -w /work debian /bin/bash
 ```
 ```shell
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 365
+apt update && \
+apt install golang-cfssl && \
+cfssl gencert -initca ca-csr.json | cfssljson -bare /tmp/ca && \
+cfssl gencert \
+-ca=/tmp/ca.pem \
+-ca-key=/tmp/ca-key.pem \
+-config=/work/ca-config.json \
+-hostname="example-webhook.default.svc,example-webhook.default.svc.cluster.local,localhost,127.0.0.1" \
+-profile=default /work/ca-csr.json | cfssljson -bare /tmp/example-webhook
 ```
 Hostname will be:
 ```
@@ -23,14 +31,14 @@ kind: Secret
 metadata:
   name: example-webhook-tls
 data:
-  tls.crt: $(cat cert.pem | base64 | tr -d '\n')
-  tls.key: $(cat key.pem | base64 | tr -d '\n')
+  tls.crt: $(cat /tmp/example-webhook.pem | base64 | tr -d '\n')
+  tls.key: $(cat /tmp/example-webhook-key.pem | base64 | tr -d '\n')
 EOF
 ```
 
 - webhook.yaml caBundle substitution
 ````shell
-ca_pem=$(cat tls/cert.pem | base64 | tr -d '\n') && \
+ca_pem=$(openssl base64 -A <"/tmp/ca.pem") && \
 sed -e 's/${CA_BUNDLE}/'"$ca_pem"'/g' <"webhook-template.yaml" > webhook.yaml
 ````
 
@@ -60,7 +68,7 @@ webhooks:
       - apiGroups: [""]
       - apiVersions: ["v1"]
       - resources: ["pods"]
-      - operations: ["CREATE"]
+      - operations: ["CREATE", "UPDATE"]
 ````
 
 #### Write some code for webhook to operate
@@ -171,4 +179,113 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 		panic(err.Error())
 	}
 }
+```
+### Deploying the Kubernetes
+- Extend the docker file for new environments
+````dockerfile
+FROM golang:1.17-alpine as dev-env
+WORKDIR /app
+
+FROM dev-env as build-env
+COPY go.mod /app
+RUN go mod download
+COPY . /app
+RUN CGO_ENABLED=0 go build -o /webhook
+
+FROM alpine:3.10 as runtime
+COPY --from=build-env /webhook /usr/local/bin/webhook
+RUN chmod +x /usr/local/bin/webhook
+CMD ["webhook"]
+````
+- Build and push it to dockerhub
+- Apply the ./tls/example-webhook-tls.yaml to kubernetes
+
+#### Create RBAC
+````yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-webhook
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: example-webhook
+  namespace: default
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1 
+kind: ClusterRoleBinding
+metadata:
+  name: example-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  name: example-webhook
+subjects:
+  - kind: ServiceAccount
+    name: example-webhook
+````
+- Deployment is created
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-webhook
+  namespace: default
+spec:
+  selector:
+    app: example-webhook
+  ports:
+    - port: 443
+      targetPort: tls
+      name: application
+    - port: 80
+      targetPort: metrics
+      name: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: example-webhook
+  name: example-webhook
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-webhook
+  template:
+    metadata:
+      labels:
+        app: example-webhook
+    spec:
+      serviceAccountName: example-webhook
+      volumes:
+        - name: webhook-tls-certs
+          secret:
+            secretName: example-webhook-tls
+      containers:
+        - image: sprayo7/example-webhook
+          name: server
+          command:
+            - sh
+          ports:
+            - containerPort: 8443
+              name: tls
+            - containerPort: 80
+              name: metrics
+          volumeMounts:
+            - mountPath: /etc/webhook/certs
+              name: webhook-tls-certs
 ```
