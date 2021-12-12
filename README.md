@@ -343,6 +343,9 @@ go get k8s.io/api/core/v1
 
 - To JsonPatch operations
   - Appropriate way to create AdmissionResponse is creating it manually with patch operations. 
+- In webhook configuration, we set admissionReviewVersion as v1beta1, therefore we are waited to send response that has apiVersion: admission.k8s.io/v1beta1.
+  - If we set it admissionReviewVersion as another variable we need to write data to response according to apiVersion we used.
+  - Like annotated [here](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#response)
 ```
 	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
 	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))

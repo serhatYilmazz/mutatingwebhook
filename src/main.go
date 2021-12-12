@@ -1,12 +1,11 @@
 package main
 
 import (
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	admisv1 "k8s.io/api/admission/v1"
+	"k8s.io/api/admission/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -115,7 +114,7 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err.Error())
 	}
-	var admissionReviewReq admisv1.AdmissionReview
+	var admissionReviewReq v1beta1.AdmissionReview
 	_, _, err = globalDeserializer.UniversalDeserializer().Decode(body, nil, &admissionReviewReq)
 	bytes, err := json.Marshal(&admissionReviewReq)
 	if err != nil {
@@ -143,27 +142,33 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 		panic(err.Error())
 	}
 
-	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
-	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))
+	labels := pod.ObjectMeta.Labels
+	labels["example-webhook"] = "worked-like-charm"
 
-	admissionReviewResponse := AdmissionReviewResponse{
-		ApiVersion: "admission.k8s.io/v1",
-		Kind:       "AdmissionReview",
-		Response: Response{
-			UID:     string(admissionReviewReq.Request.UID),
+	var patches []PatchOperation
+	patches = append(patches, PatchOperation{
+		Op:    "add",
+		Path:  "/metadata/labels",
+		Value: labels,
+	})
+
+	patchesBytes, _ := json.Marshal(patches)
+
+	admissionReviewResponse := v1beta1.AdmissionReview{
+		Response: &v1beta1.AdmissionResponse{
+			UID:     admissionReviewReq.Request.UID,
 			Allowed: true,
-			PatchType: "JSONPatch",
-			Patch: patchEnc,
+			Patch:   patchesBytes,
 		},
 	}
 
 	fmt.Printf("admissionReviewResponse is: %+v\n", admissionReviewResponse)
-	marshal, err := json.Marshal(&admissionReviewResponse)
+	responseByte, err := json.Marshal(&admissionReviewResponse)
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("marshalled admission review is: %+v\n", marshal)
-	writer.Write(marshal)
+	fmt.Printf("marshalled admission review is: %+v\n", responseByte)
+	writer.Write(responseByte)
 }
 
 func HandleRoot(writer http.ResponseWriter, request *http.Request) {
