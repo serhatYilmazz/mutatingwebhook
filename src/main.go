@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"k8s.io/api/admission/v1beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -18,13 +19,18 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"k8s.io/api/core/v1"
 )
 
 type ServerParameters struct {
 	port     int    // webhook server port
 	certFile string // path to the x509 certificate for https
 	keyFile  string // path to the x509 private key matching Certfile
+}
+
+type PatchOperation struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value,omitempty"`
 }
 
 var (
@@ -88,10 +94,7 @@ func main() {
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
-		panic(err.Error())
-	}
-	err = ioutil.WriteFile("/tmp/request", body, 0644)
-	if err != nil {
+		fmt.Printf("Error while ioutil.ReadAll")
 		panic(err.Error())
 	}
 
@@ -116,6 +119,34 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 		panic(err.Error())
 	}
 
+	var patches []PatchOperation
+
+	labels := pod.ObjectMeta.Labels
+	labels["example-webhook"] = "it-worked"
+
+	patches = append(patches, PatchOperation{
+		Op:    "add",
+		Path:  "/metadata/labels",
+		Value: labels,
+	})
+
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	admissionReviewResponse := v1beta1.AdmissionReview{Response: &v1beta1.AdmissionResponse{
+		UID:     admissionReviewReq.Request.UID,
+		Allowed: true,
+		Patch:   patchBytes,
+	}}
+
+	marshal, err := json.Marshal(&admissionReviewResponse)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	writer.Write(marshal)
 }
 
 func HandleRoot(writer http.ResponseWriter, request *http.Request) {
