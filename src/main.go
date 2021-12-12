@@ -143,7 +143,7 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	labels := pod.ObjectMeta.Labels
-	labels["example-webhook"] = "worked-like-charm"
+	labels["example-webhook"] = "worked-like-a-charm"
 
 	var patches []PatchOperation
 	patches = append(patches, PatchOperation{

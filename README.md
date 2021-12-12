@@ -347,27 +347,31 @@ go get k8s.io/api/core/v1
   - If we set it admissionReviewVersion as another variable we need to write data to response according to apiVersion we used.
   - Like annotated [here](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#response)
 ```
-	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
-	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))
+labels := pod.ObjectMeta.Labels
+	labels["example-webhook"] = "worked-like-a-charm"
 
-	admissionReviewResponse := AdmissionReviewResponse{
-		ApiVersion: "admission.k8s.io/v1",
-		Kind:       "AdmissionReview",
-		Response: Response{
-			UID:     string(admissionReviewReq.Request.UID),
+	var patches []PatchOperation
+	patches = append(patches, PatchOperation{
+		Op:    "add",
+		Path:  "/metadata/labels",
+		Value: labels,
+	})
+
+	patchesBytes, _ := json.Marshal(patches)
+
+	admissionReviewResponse := v1beta1.AdmissionReview{
+		Response: &v1beta1.AdmissionResponse{
+			UID:     admissionReviewReq.Request.UID,
 			Allowed: true,
-			PatchType: "JSONPatch",
-			Patch: patchEnc,
+			Patch:   patchesBytes,
 		},
 	}
 
-	fmt.Printf("admissionReviewResponse is: %+v\n", admissionReviewResponse)
-	marshal, err := json.Marshal(&admissionReviewResponse)
+	responseByte, err := json.Marshal(&admissionReviewResponse)
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("marshalled admission review is: %+v\n", marshal)
-	writer.Write(marshal)
+	writer.Write(responseByte)
 ```
 
 ### Last Step Test
