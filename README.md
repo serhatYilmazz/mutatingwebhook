@@ -336,32 +336,25 @@ go get k8s.io/api/core/v1
 
 - To JsonPatch operations
 ```
-	var patches []PatchOperation
+	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
+	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))
 
-	labels := pod.ObjectMeta.Labels
-	labels["example-webhook"] = "it-worked"
-
-	patches = append(patches, PatchOperation{
-		Op:    "add",
-		Path:  "/metadata/labels",
-		Value: labels,
-	})
-
-	patchBytes, err := json.Marshal(patches)
-	if err != nil {
-		panic(err.Error())
+	admissionReviewResponse := AdmissionReviewResponse{
+		ApiVersion: "admission.k8s.io/v1",
+		Kind:       "AdmissionReview",
+		Response: Response{
+			UID:     string(admissionReviewReq.Request.UID),
+			Allowed: true,
+			PatchType: "JSONPatch",
+			Patch: patchEnc,
+		},
 	}
 
-	admissionReviewResponse := v1beta1.AdmissionReview{Response: &v1beta1.AdmissionResponse{
-		UID:     admissionReviewReq.Request.UID,
-		Allowed: true,
-		Patch:   patchBytes,
-	}}
-
+	fmt.Printf("admissionReviewResponse is: %+v\n", admissionReviewResponse)
 	marshal, err := json.Marshal(&admissionReviewResponse)
 	if err != nil {
 		panic(err.Error())
 	}
-
+	fmt.Printf("marshalled admission review is: %+v\n", marshal)
 	writer.Write(marshal)
 ```

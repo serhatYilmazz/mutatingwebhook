@@ -5,6 +5,7 @@ FROM dev-env as build-env
 COPY go.mod /app
 RUN go mod download
 COPY . /app
+RUN cat main.go
 RUN CGO_ENABLED=0 go build -o /webhook
 
 FROM alpine:3.10 as runtime

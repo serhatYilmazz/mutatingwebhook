@@ -1,11 +1,12 @@
 package main
 
 import (
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/api/admission/v1beta1"
+	admisv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -31,6 +32,19 @@ type PatchOperation struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
 	Value interface{} `json:"value,omitempty"`
+}
+
+type AdmissionReviewResponse struct {
+	ApiVersion string   `json:"apiVersion"`
+	Kind       string   `json:"kind"`
+	Response   Response `json:"response"`
+}
+
+type Response struct {
+	UID       string `json:"uid"`
+	Allowed   bool   `json:"allowed"`
+	PatchType string `json:"patchType"`
+	Patch     string `json:"patch"`
 }
 
 var (
@@ -86,6 +100,7 @@ func main() {
 	clientSet = forConfig
 
 	test()
+	fmt.Printf("Handle'a geldim")
 	http.HandleFunc("/", HandleRoot)
 	http.HandleFunc("/mutate", HandleMutate)
 	log.Fatal(http.ListenAndServeTLS(":"+strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
@@ -94,12 +109,20 @@ func main() {
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
-		fmt.Printf("Error while ioutil.ReadAll")
 		panic(err.Error())
 	}
-
-	var admissionReviewReq v1beta1.AdmissionReview
+	err = ioutil.WriteFile("/tmp/request", body, 0644)
+	if err != nil {
+		panic(err.Error())
+	}
+	var admissionReviewReq admisv1.AdmissionReview
 	_, _, err = globalDeserializer.UniversalDeserializer().Decode(body, nil, &admissionReviewReq)
+	bytes, err := json.Marshal(&admissionReviewReq)
+	if err != nil {
+		panic(err.Error())
+	}
+	log.Printf("%v\n, admissionReviewReq")
+	ioutil.WriteFile("/tmp/admission", bytes, 0644)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		fmt.Errorf("Could not deserialize request: %v", err)
@@ -115,37 +138,31 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 
 	var pod v1.Pod
 	err = json.Unmarshal(admissionReviewReq.Request.Object.Raw, &pod)
+	fmt.Printf("Pod is: %+v\n", pod)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	var patches []PatchOperation
+	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
+	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))
 
-	labels := pod.ObjectMeta.Labels
-	labels["example-webhook"] = "it-worked"
-
-	patches = append(patches, PatchOperation{
-		Op:    "add",
-		Path:  "/metadata/labels",
-		Value: labels,
-	})
-
-	patchBytes, err := json.Marshal(patches)
-	if err != nil {
-		panic(err.Error())
+	admissionReviewResponse := AdmissionReviewResponse{
+		ApiVersion: "admission.k8s.io/v1",
+		Kind:       "AdmissionReview",
+		Response: Response{
+			UID:     string(admissionReviewReq.Request.UID),
+			Allowed: true,
+			PatchType: "JSONPatch",
+			Patch: patchEnc,
+		},
 	}
 
-	admissionReviewResponse := v1beta1.AdmissionReview{Response: &v1beta1.AdmissionResponse{
-		UID:     admissionReviewReq.Request.UID,
-		Allowed: true,
-		Patch:   patchBytes,
-	}}
-
+	fmt.Printf("admissionReviewResponse is: %+v\n", admissionReviewResponse)
 	marshal, err := json.Marshal(&admissionReviewResponse)
 	if err != nil {
 		panic(err.Error())
 	}
-
+	fmt.Printf("marshalled admission review is: %+v\n", marshal)
 	writer.Write(marshal)
 }
 
