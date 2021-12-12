@@ -347,7 +347,7 @@ go get k8s.io/api/core/v1
   - If we set it admissionReviewVersion as another variable we need to write data to response according to apiVersion we used.
   - Like annotated [here](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#response)
 ```
-labels := pod.ObjectMeta.Labels
+    labels := pod.ObjectMeta.Labels
 	labels["example-webhook"] = "worked-like-a-charm"
 
 	var patches []PatchOperation
