@@ -9,18 +9,14 @@ docker run -it --rm -v ${PWD}:/work -w /work debian /bin/bash
 ```
 ```shell
 apt update && \
-apt install golang-cfssl && \
-cfssl gencert -initca ca-csr.json | cfssljson -bare /tmp/ca && \
+apt install golang-cfssl -y && \
+cfssl gencert -initca tls/ca-csr.json | cfssljson -bare /tmp/ca && \
 cfssl gencert \
 -ca=/tmp/ca.pem \
 -ca-key=/tmp/ca-key.pem \
--config=/work/ca-config.json \
+-config=/work/tls/ca-config.json \
 -hostname="example-webhook.default.svc,example-webhook.default.svc.cluster.local,localhost,127.0.0.1" \
--profile=default /work/ca-csr.json | cfssljson -bare /tmp/example-webhook
-```
-Hostname will be:
-```
-example-webhook.default.svc
+-profile=default /work/tls/ca-csr.json | cfssljson -bare /tmp/example-webhook
 ```
 
 - Create tls.key and tls.crt secret
@@ -289,3 +285,22 @@ spec:
             - mountPath: /etc/webhook/certs
               name: webhook-tls-certs
 ```
+
+- Apply RBAC and Deployment
+```
+kubectl apply -f deployment.yaml && \
+kubectl apply -f rbac.yaml
+```
+
+- After checking pods are OK, apply the webhook.
+```
+kubectl apply -f webhook.yaml
+```
+### Trying the mutate endpoint
+- Create a dummy pod
+- It is an unsuccessful operation. Because we didn't finish the mutate process.
+
+### Admission Review
+````shell
+go get k8s.io/api/admission/v1beta1
+````

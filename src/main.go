@@ -83,6 +83,7 @@ func main() {
 
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
+	log.Printf("Handle Mutate\n")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -90,6 +91,7 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err.Error())
 	}
+	log.Printf("Handle Mutate written to file\n")
 }
 
 func HandleRoot(writer http.ResponseWriter, request *http.Request) {
