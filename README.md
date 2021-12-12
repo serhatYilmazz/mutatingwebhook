@@ -1,3 +1,10 @@
+## Mutating Admission Webhook
+- The purpose of this example is to create a webhook that has some object selector. Created objects that have this selector is added a label like:
+```
+example-webhook=it-worked
+```
+- If you create a pod with label **example-webhook-enabled=true**, you can see that the above label is also added automatically after creation of the pod.
+
 ### Create a kind cluster
 ```shell
 kind create cluster --name webhook --image kindest/node:v1.23.0
@@ -335,6 +342,7 @@ go get k8s.io/api/core/v1
 ```
 
 - To JsonPatch operations
+  - Appropriate way to create AdmissionResponse is creating it manually with patch operations. 
 ```
 	patches := `[{"op": "add", "path": "/metadata/labels/example-webhook", "value": "it-worked"}]`
 	patchEnc := base64.StdEncoding.EncodeToString([]byte(patches))
@@ -357,4 +365,15 @@ go get k8s.io/api/core/v1
 	}
 	fmt.Printf("marshalled admission review is: %+v\n", marshal)
 	writer.Write(marshal)
+```
+
+### Last Step Test
+- Deploy an nginx pod with selector label
+```
+...
+metadata:
+  name: demo-pod
+  labels:
+    example-webhook-enabled: 'true'
+...
 ```
