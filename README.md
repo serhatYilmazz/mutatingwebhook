@@ -335,3 +335,33 @@ go get k8s.io/api/core/v1
 ```
 
 - To JsonPatch operations
+```
+	var patches []PatchOperation
+
+	labels := pod.ObjectMeta.Labels
+	labels["example-webhook"] = "it-worked"
+
+	patches = append(patches, PatchOperation{
+		Op:    "add",
+		Path:  "/metadata/labels",
+		Value: labels,
+	})
+
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	admissionReviewResponse := v1beta1.AdmissionReview{Response: &v1beta1.AdmissionResponse{
+		UID:     admissionReviewReq.Request.UID,
+		Allowed: true,
+		Patch:   patchBytes,
+	}}
+
+	marshal, err := json.Marshal(&admissionReviewResponse)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	writer.Write(marshal)
+```
