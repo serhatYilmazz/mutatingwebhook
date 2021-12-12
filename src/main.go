@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -15,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"k8s.io/api/core/v1"
 )
 
 type ServerParameters struct {
@@ -78,12 +82,11 @@ func main() {
 	test()
 	http.HandleFunc("/", HandleRoot)
 	http.HandleFunc("/mutate", HandleMutate)
-	log.Fatal(http.ListenAndServeTLS(":" + strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
+	log.Fatal(http.ListenAndServeTLS(":"+strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
 }
 
 func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
-	log.Printf("Handle Mutate\n")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -91,7 +94,28 @@ func HandleMutate(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err.Error())
 	}
-	log.Printf("Handle Mutate written to file\n")
+
+	var admissionReviewReq v1beta1.AdmissionReview
+	_, _, err = globalDeserializer.UniversalDeserializer().Decode(body, nil, &admissionReviewReq)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		fmt.Errorf("Could not deserialize request: %v", err)
+	} else if admissionReviewReq.Request == nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		errors.New("malformed admission review: request is nil")
+	}
+
+	fmt.Printf("Type: %v\tEvent: %v\tName: %v\n",
+		admissionReviewReq.Request.Kind,
+		admissionReviewReq.Request.Operation,
+		admissionReviewReq.Request.Name)
+
+	var pod v1.Pod
+	err = json.Unmarshal(admissionReviewReq.Request.Object.Raw, &pod)
+	if err != nil {
+		panic(err.Error())
+	}
+
 }
 
 func HandleRoot(writer http.ResponseWriter, request *http.Request) {

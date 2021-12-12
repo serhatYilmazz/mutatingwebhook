@@ -304,3 +304,34 @@ kubectl apply -f webhook.yaml
 ````shell
 go get k8s.io/api/admission/v1beta1
 ````
+
+````
+	var admissionReviewReq v1beta1.AdmissionReview
+	_, _, err = globalDeserializer.UniversalDeserializer().Decode(body, nil, &admissionReviewReq)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		fmt.Errorf("Could not deserialize request: %v", err)
+	} else if admissionReviewReq.Request == nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		errors.New("malformed admission review: request is nil")
+	}
+
+	fmt.Printf("Type: %v\tEvent: %v\tName: %v\n",
+		admissionReviewReq.Request.Kind,
+		admissionReviewReq.Request.Operation,
+		admissionReviewReq.Request.Name)
+````
+- to unmarshal the pod
+````shell
+go get k8s.io/api/core/v1
+````
+
+```
+	var pod v1.Pod
+	err := json.Unmarshal(admissionReviewReq.Request.Object.Raw, &pod)
+	if err != nil {
+		panic(err.Error())
+	}
+```
+
+- To JsonPatch operations
