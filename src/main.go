@@ -99,7 +99,6 @@ func main() {
 	clientSet = forConfig
 
 	test()
-	fmt.Printf("Handle'a geldim")
 	http.HandleFunc("/", HandleRoot)
 	http.HandleFunc("/mutate", HandleMutate)
 	log.Fatal(http.ListenAndServeTLS(":"+strconv.Itoa(serverParameters.port), serverParameters.certFile, serverParameters.keyFile, nil))
